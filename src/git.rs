@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use git2::{Repository, StatusOptions};
-use std::path::PathBuf;
+use git2::{DiffFormat, DiffOptions, Repository, StatusOptions};
+use std::{path::PathBuf, process::Command};
 
 pub struct GitEngine {
     repo: Repository,
@@ -50,5 +50,65 @@ impl GitEngine {
         }
 
         Ok(changed_files)
+    }
+
+    /// Get the diff of all changes (staged and unstaged) against HEAD
+    pub fn get_diff(&self) -> Result<String> {
+        let mut diff_opts = DiffOptions::new();
+
+        // Get the current HEAD (the latest commit) and turn it into a "Tree"
+        let head = self
+            .repo
+            .head()
+            .context("Failed to get HEAD. Is there an initial commit?")?;
+        let head_tree = head.peel_to_tree().context("Failed to peel HEAD to tree")?;
+
+        // Generate the diff between the HEAD tree and the current working directory
+        let diff = self
+            .repo
+            .diff_tree_to_workdir_with_index(Some(&head_tree), Some(&mut diff_opts))
+            .context("Failed to generate diff")?;
+
+        let mut diff_text = String::new();
+
+        // Format the diff into a standard patch (similar to `git diff`)
+        diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
+            let origin = line.origin();
+
+            // Add the +, -, or space prefix to the line
+            let prefix = match origin {
+                '+' | '-' | ' ' => origin.to_string(),
+                _ => String::new(),
+            };
+
+            // Convert the raw bytes to a UTF-8 string and push it to our diff_text
+            if let Ok(content) = std::str::from_utf8(line.content()) {
+                diff_text.push_str(&format!("{}{}", prefix, content));
+            }
+
+            true // Return true to continue iterating through the diff lines
+        })
+        .context("Failed to print diff")?;
+
+        Ok(diff_text)
+    }
+
+    /// Execute the actual git commit
+    pub fn commit(&self, message: &str) -> Result<()> {
+        // While we COULD use git2 to create the commit, using std::process::Command
+        // to shell out to the git executable is often better for the final commit.
+        // This ensures the user's pre-commit hooks, GPG signing, and global git
+        // config are all executed correctly automatically!
+
+        let status = Command::new("git")
+            .args(["commit", "-a", "-m", message]) // -a stages all modified/deleted files
+            .status()
+            .context("Failed to execute git commit command")?;
+
+        if status.success() {
+            Ok(())
+        } else {
+            anyhow::bail!("Git commit failed or was aborted.");
+        }
     }
 }
