@@ -4,7 +4,9 @@ mod llm;
 mod llm_providers;
 
 use anyhow::{Context, Result};
+use arboard::Clipboard;
 use clap::{Parser, Subcommand};
+use dialoguer::{Input, Select, theme::ColorfulTheme};
 
 use crate::{git::GitEngine, llm::CommitContext};
 
@@ -37,12 +39,12 @@ async fn main() -> Result<()> {
     registry.register("avalai", crate::llm_providers::avalai::build_avalai);
 
     let cli = Cli::parse();
+    let git_engine = GitEngine::new()?;
 
     match &cli.command {
         Commands::Status => {
             println!("Analyzing repository...\n");
 
-            let git_engine = GitEngine::new()?;
             let changed_files = git_engine.get_changed_files()?;
 
             if changed_files.is_empty() {
@@ -64,7 +66,6 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Diff => {
-            let git_engine = GitEngine::new()?;
             let diff = git_engine.get_diff()?;
 
             if diff.is_empty() {
@@ -76,7 +77,6 @@ async fn main() -> Result<()> {
         Commands::Generate => {
             println!("Analyzing diff and generating message...\n");
 
-            let git_engine = GitEngine::new()?;
             let diff = git_engine.get_diff()?;
 
             if diff.is_empty() {
@@ -95,13 +95,65 @@ async fn main() -> Result<()> {
             let context = CommitContext { diff };
             let message = provider_strategy.generate_commit(&context).await?;
 
-            println!("✨ Suggested Commit Message:\n");
-            println!("{}", message);
-            println!("\n(Use 'gitmind commit' to apply this, once implemented)");
+            // println!("✨ Suggested Commit Message:\n");
+            // println!("{}", message);
+            // println!("\n(Use 'gitmind commit' to apply this, once implemented)");
+
+            println!(
+                "\nGenerated Commit Message:\n------------------------\n{}\n------------------------\n",
+                message
+            );
+            // We make the message mutable so the user can edit it if they choose to
+            let mut final_message = message;
+            let options = &["Commit now", "Edit message", "Copy to clipboard", "Cancel"];
+
+            // This loop keeps asking until the user commits or cancels
+            loop {
+                // Show the interactive menu
+                let selection = Select::with_theme(&ColorfulTheme::default())
+                    .with_prompt("What would you like to do?")
+                    .default(0) // Default to the first option
+                    .items(&options[..])
+                    .interact()?; // Wait for user input
+
+                match selection {
+                    0 => {
+                        // "Commit now"
+                        println!("Committing...");
+                        git_engine.commit(&final_message)?;
+                        println!("Commit successful!");
+                        break;
+                    }
+                    1 => {
+                        // "Edit message"
+                        // Use dialoguer's Input to let them type a new message,
+                        // prepopulated with the LLM's message!
+                        final_message = Input::with_theme(&ColorfulTheme::default())
+                            .with_prompt("Edit message")
+                            .default(final_message)
+                            .interact_text()?;
+                        println!("\nUpdated message to:\n{}\n", final_message);
+                        // The loop repeats so they can choose to commit it now!
+                    }
+                    2 => {
+                        // "Copy to clipboard"
+                        let mut clipboard =
+                            Clipboard::new().context("Failed to access clipboard")?;
+                        clipboard
+                            .set_text(&final_message)
+                            .context("Failed to copy to clipboard")?;
+                        println!("Copied to clipboard!");
+                        break;
+                    }
+                    3 | _ => {
+                        // "Cancel" or escape
+                        println!("Aborted.");
+                        break;
+                    }
+                }
+            }
         }
         Commands::Commit => {
-            let git_engine = GitEngine::new()?;
-
             // For now, since we don't have the LLM hooked up,
             // we will just use a hardcoded test message.
             let test_message = "feat(gitmind): test automatic commit via CLI";
