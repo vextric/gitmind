@@ -1,5 +1,9 @@
+mod git;
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+
+use crate::git::GitEngine;
 
 /// 🧠 GitMind: An AI-powered Git commit assistant
 #[derive(Parser, Debug)]
@@ -27,8 +31,21 @@ async fn main() -> Result<()> {
 
     match &cli.command {
         Commands::Status => {
-            println!("Running status...");
-            // TODO: Hook up git2 status here
+            println!("Analyzing repository...\n");
+
+            let git_engine = GitEngine::new()?;
+            let changed_files = git_engine.get_changed_files()?;
+
+            if changed_files.is_empty() {
+                println!("No changes detected. Working tree is clean.");
+            } else {
+                println!("Changed files:");
+                for file in changed_files {
+                    // .display() safely formats the file path for terminal output
+                    // functionality
+                    println!("  - {}", file.display());
+                }
+            }
         }
         Commands::Diff => {
             println!("Running diff...");
