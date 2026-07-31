@@ -39,25 +39,39 @@ async fn main() -> Result<()> {
             if changed_files.is_empty() {
                 println!("No changes detected. Working tree is clean.");
             } else {
+                // TODO: Mark the untracked files and don't show them as changed
                 println!("Changed files:");
+
                 for file in changed_files {
                     // .display() safely formats the file path for terminal output
-                    // functionality
                     println!("  - {}", file.display());
                 }
             }
         }
         Commands::Diff => {
-            println!("Running diff...");
-            // TODO: Hook up git2 diff here
+            let git_engine = GitEngine::new()?;
+            let diff = git_engine.get_diff()?;
+
+            if diff.is_empty() {
+                println!("No changes to diff.");
+            } else {
+                println!("{}", diff);
+            }
         }
         Commands::Generate => {
             println!("Generating commit message...");
             // TODO: Hook up LLM here
         }
         Commands::Commit => {
-            println!("Committing changes...");
-            // TODO: Generate and run git commit
+            let git_engine = GitEngine::new()?;
+
+            // For now, since we don't have the LLM hooked up,
+            // we will just use a hardcoded test message.
+            let test_message = "feat(gitmind): test automatic commit via CLI";
+
+            println!("Committing with message: '{}'", test_message);
+            git_engine.commit(test_message)?;
+            println!("Commit successful!");
         }
     }
 
