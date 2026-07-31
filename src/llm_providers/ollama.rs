@@ -1,4 +1,3 @@
-use anyhow::{Context, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -6,6 +5,7 @@ use tracing::{debug, error};
 
 use crate::{
     config::GitMindConfig,
+    error::GitMindError,
     llm::{CommitContext, LlmProvider},
 };
 
@@ -44,7 +44,7 @@ struct OllamaResponse {
 
 #[async_trait]
 impl LlmProvider for OllamaProvider {
-    async fn generate_commit(&self, context: &CommitContext) -> Result<String> {
+    async fn generate_commit(&self, context: &CommitContext) -> Result<String, GitMindError> {
         // Ollama's standard /api/generate endpoint takes a single combined prompt.
         // We use the format! macro to combine the system instructions and the code diff.
         let full_prompt = format!("{}\n\nCode Diff:\n{}", self.prompt, context.diff);
@@ -70,21 +70,17 @@ impl LlmProvider for OllamaProvider {
             .post(&url)
             .json(&request_body)
             .send()
-            .await
-            .context("Failed to send request to Ollama")?;
+            .await?;
 
         // Check for success
         if !response.status().is_success() {
             let error_text = response.text().await?;
             error!("Ollama API returned an error: {}", error_text);
-            anyhow::bail!("Ollama API error: {}", error_text);
+            return Err(GitMindError::LlmApiError(error_text));
         }
 
         // Parse the JSON response
-        let response_data: OllamaResponse = response
-            .json()
-            .await
-            .context("Failed to parse Ollama response")?;
+        let response_data: OllamaResponse = response.json().await?;
 
         // Return the string, trimming any excess whitespace or newlines
         Ok(response_data.response.trim().to_string())
@@ -92,11 +88,11 @@ impl LlmProvider for OllamaProvider {
 }
 
 /// The specific builder function for the Ollama strategy
-pub fn build_ollama(config: &GitMindConfig) -> anyhow::Result<Box<dyn LlmProvider>> {
+pub fn build_ollama(config: &GitMindConfig) -> Result<Box<dyn LlmProvider>, GitMindError> {
     let o_conf = config
         .ollama
         .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("Ollama config section is missing from .gitmind.toml"))?;
+        .ok_or_else(|| GitMindError::MissingProviderConfig("ollama".into()))?;
 
     // This is a test comment to test the app
     let client = OllamaProvider::new(

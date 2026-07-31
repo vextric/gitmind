@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::GitMindError;
 use git2::{DiffFormat, DiffOptions, Repository, StatusOptions};
 use std::{
     path::{Path, PathBuf},
@@ -25,10 +25,9 @@ pub struct GitEngine {
 
 impl GitEngine {
     /// Initialize a new GitEngine by opening the repository in the current directory
-    pub fn new() -> Result<Self> {
+    pub fn new() -> Result<Self, GitMindError> {
         // We look for a git repository in the current directory (".")
-        let repo = Repository::open(".")
-            .context("Failed to open git repository. Are you running this inside a git folder?")?;
+        let repo = Repository::open(".")?;
 
         Ok(Self { repo })
     }
@@ -41,7 +40,7 @@ impl GitEngine {
     }
 
     /// Get a list of changed files (modified, added, deleted, untracked)
-    pub fn get_changed_files(&self) -> Result<Vec<GitFile>> {
+    pub fn get_changed_files(&self) -> Result<Vec<GitFile>, GitMindError> {
         let mut options = StatusOptions::new();
 
         // We want to see untracked files, but skip ignored files (like target/ or node_modules/)
@@ -88,22 +87,18 @@ impl GitEngine {
     }
 
     /// Get the diff of all changes (staged and unstaged) against HEAD
-    pub fn get_diff(&self, ignored_exts: &[String]) -> Result<String> {
+    pub fn get_diff(&self, ignored_exts: &[String]) -> Result<String, GitMindError> {
         debug!("Generating git diff against HEAD...");
         let mut diff_opts = DiffOptions::new();
 
         // Get the current HEAD (the latest commit) and turn it into a "Tree"
-        let head = self
-            .repo
-            .head()
-            .context("Failed to get HEAD. Is there an initial commit?")?;
-        let head_tree = head.peel_to_tree().context("Failed to peel HEAD to tree")?;
+        let head = self.repo.head()?;
+        let head_tree = head.peel_to_tree()?;
 
         // Generate the diff between the HEAD tree and the current working directory
         let diff = self
             .repo
-            .diff_tree_to_workdir_with_index(Some(&head_tree), Some(&mut diff_opts))
-            .context("Failed to generate diff")?;
+            .diff_tree_to_workdir_with_index(Some(&head_tree), Some(&mut diff_opts))?;
 
         let mut diff_text = String::new();
 
@@ -138,14 +133,13 @@ impl GitEngine {
             }
 
             true // Return true to continue iterating through the diff lines
-        })
-        .context("Failed to print diff")?;
+        })?;
 
         Ok(diff_text)
     }
 
     /// Execute the actual git commit
-    pub fn commit(&self, message: &str) -> Result<()> {
+    pub fn commit(&self, message: &str) -> Result<(), GitMindError> {
         debug!("Executing 'git commit -a -m ...'");
         // While we COULD use git2 to create the commit, using std::process::Command
         // to shell out to the git executable is often better for the final commit.
@@ -154,13 +148,12 @@ impl GitEngine {
 
         let status = Command::new("git")
             .args(["commit", "-a", "-m", message]) // -a stages all modified/deleted files
-            .status()
-            .context("Failed to execute git commit command")?;
+            .status()?;
 
         if status.success() {
             Ok(())
         } else {
-            anyhow::bail!("Git commit failed or was aborted.");
+            Err(GitMindError::Generic("Git commit failed or was aborted.".into()))
         }
     }
 }

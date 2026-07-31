@@ -29,6 +29,7 @@ GitMind solves this by reading the actual code diffs, understanding the context 
 - 🦀 **Written in Rust:** Fast, memory-safe, and compiled for performance.
 - 📚 **Learning Focused:** Built from the ground up to understand system-level interactions and API integrations.
 - 🧠 **Smart Diff Analysis:** Parses `git diff` intelligently before sending it to the LLM to avoid overwhelming the context window.
+- ⚙️ **Configurable:** Uses a `.gitmind.toml` config file to define ignored file extensions, custom system prompts, and active LLM providers.
 - 🌐 **Multi-LLM Support:** Will support local models (Ollama) and cloud APIs (OpenAI, Anthropic).
 - 🖥️ **Interactive TUI:** A beautiful terminal user interface (built with `ratatui`) to review diffs, select files, and approve generated messages.
 
@@ -60,6 +61,7 @@ cargo run -- --help
 - [Tokio](https://tokio.rs/) - Async runtime
 - [dialoguer](https://crates.io/crates/dialoguer)
 - [serde](https://crates.io/crates/serde)
-- [arboard](https://crates.io/crates/arboard)
-- [anyhow](https://crates.io/crates/anyhow)
+- [arboard](https://crates.io/crates/arboard) - Clipboard integration
+- [thiserror](https://crates.io/crates/thiserror) - Robust custom error handling
+- [tracing](https://crates.io/crates/tracing) - Structured asynchronous logging
 - _Future: Ratatui, Crossterm, Portable-pty_

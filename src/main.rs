@@ -1,16 +1,16 @@
 mod config;
+mod error;
 mod git;
 mod llm;
 mod llm_providers;
 
-use anyhow::{Context, Result};
 use arboard::Clipboard;
 use clap::{Parser, Subcommand};
 use dialoguer::{Input, Select, theme::ColorfulTheme};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 use tracing_subscriber::EnvFilter;
 
-use crate::{git::GitEngine, llm::CommitContext};
+use crate::{error::GitMindError, git::GitEngine, llm::CommitContext};
 
 /// 🧠 GitMind: An AI-powered Git commit assistant
 #[derive(Parser, Debug)]
@@ -56,7 +56,7 @@ async fn main() {
     }
 }
 
-async fn run_app() -> Result<()> {
+async fn run_app() -> Result<(), GitMindError> {
     let cli = Cli::parse();
 
     let mut registry = crate::llm::ProviderRegistry::new();
@@ -70,7 +70,7 @@ async fn run_app() -> Result<()> {
 
     let repo_root = git_engine
         .get_repo_root()
-        .context("Could not determine repository root")?;
+        .ok_or_else(|| GitMindError::Generic("Could not determine repository root".into()))?;
     
     let config = config::GitMindConfig::load(repo_root)?;
     debug!("Config loaded. Active provider: {}", config.active_provider);
@@ -183,11 +183,8 @@ async fn run_app() -> Result<()> {
                     }
                     2 => {
                         // "Copy to clipboard"
-                        let mut clipboard =
-                            Clipboard::new().context("Failed to access clipboard")?;
-                        clipboard
-                            .set_text(&final_message)
-                            .context("Failed to copy to clipboard")?;
+                        let mut clipboard = Clipboard::new()?;
+                        clipboard.set_text(&final_message)?;
                         info!("Copied to clipboard!");
                         break;
                     }

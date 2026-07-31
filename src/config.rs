@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use crate::error::GitMindError;
 use serde::Deserialize;
 use tracing::debug;
 use std::fs;
@@ -42,20 +42,17 @@ pub struct AvalAiConfig {
 
 impl GitMindConfig {
     // We now accept the repository root path as an argument
-    pub fn load(repo_root: &Path) -> Result<Self> {
+    pub fn load(repo_root: &Path) -> Result<Self, GitMindError> {
         // Construct the path: <repo_root>/.gitmind.toml
         let config_path = repo_root.join(".gitmind.toml");
         debug!("Looking for configuration file at {:?}", config_path);
 
         // Read the file. If it doesn't exist, we provide a helpful error message.
-        let config_str = fs::read_to_string(&config_path).context(format!(
-            "Could not find or read config file at {:?}. Did you create a .gitmind.toml file?",
-            config_path
-        ))?;
+        let config_str = fs::read_to_string(&config_path)
+            .map_err(|_| GitMindError::ConfigNotFound(config_path.clone()))?;
 
         // Parse the TOML string into our struct just like before
-        let config: GitMindConfig =
-            toml::from_str(&config_str).context("Failed to parse .gitmind.toml config file")?;
+        let config: GitMindConfig = toml::from_str(&config_str)?;
         
         debug!("Successfully loaded and parsed .gitmind.toml");
 

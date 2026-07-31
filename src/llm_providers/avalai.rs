@@ -1,4 +1,3 @@
-use anyhow::{Context, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -6,6 +5,7 @@ use tracing::{debug, error};
 
 use crate::{
     config::GitMindConfig,
+    error::GitMindError,
     llm::{CommitContext, LlmProvider},
 };
 
@@ -58,7 +58,7 @@ struct Content {
 
 #[async_trait]
 impl LlmProvider for AvalAiProvider {
-    async fn generate_commit(&self, context: &CommitContext) -> Result<String> {
+    async fn generate_commit(&self, context: &CommitContext) -> Result<String, GitMindError> {
         // Build the payload using our structs
         let request_body = AvalAiRequest {
             model: &self.model,
@@ -78,29 +78,28 @@ impl LlmProvider for AvalAiProvider {
             .bearer_auth(&self.api_key)
             .json(&request_body)
             .send()
-            .await
-            .context("Failed to send request to LLM")?;
+            .await?;
 
         // Ensure the request succeeded (status code 200)
         if !response.status().is_success() {
             let error_text = response.text().await?;
             error!("AvalAI API returned an error: {}", error_text);
-            anyhow::bail!("LLM API error: {}", error_text);
+            return Err(GitMindError::LlmApiError(error_text));
         }
 
         // Parse the JSON response into our AvalAiResponse struct
-        let response_data: AvalAiResponse = response
-            .json()
-            .await
-            .context("Failed to parse LLM response")?;
+        let response_data: AvalAiResponse = response.json().await?;
 
         // Extract the actual text string and clean it up
         let commit_message = response_data
             .output
             .into_iter()
             .next()
-            .context("LLM returned an empty output list")?
-            .content[0]
+            .ok_or_else(|| GitMindError::Generic("LLM returned an empty output list".into()))?
+            .content
+            .into_iter()
+            .next()
+            .ok_or_else(|| GitMindError::Generic("LLM returned an empty content list".into()))?
             .text
             .trim()
             .to_string();
@@ -109,11 +108,11 @@ impl LlmProvider for AvalAiProvider {
     }
 }
 
-pub fn build_avalai(config: &GitMindConfig) -> anyhow::Result<Box<dyn LlmProvider>> {
+pub fn build_avalai(config: &GitMindConfig) -> Result<Box<dyn LlmProvider>, GitMindError> {
     let o_conf = config
         .avalai
         .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("AvalAI config section is missing from .gitmind.toml"))?;
+        .ok_or_else(|| GitMindError::MissingProviderConfig("avalai".into()))?;
 
     let client = AvalAiProvider::new(
         o_conf.base_url.clone(),
