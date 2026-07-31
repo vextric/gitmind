@@ -27,7 +27,11 @@ enum Commands {
     /// Generate a commit message without committing
     Generate,
     /// Generate and execute the commit
-    Commit,
+    Commit {
+        /// The commit message to use
+        #[arg(short, long)] // This tells clap to expect `-m` or `--message`
+        message: String,
+    },
 }
 
 #[tokio::main]
@@ -153,13 +157,12 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        Commands::Commit => {
-            // For now, since we don't have the LLM hooked up,
-            // we will just use a hardcoded test message.
-            let test_message = "feat(gitmind): test automatic commit via CLI";
+        Commands::Commit { message } => {
+            println!("Committing with message: '{}'", message);
 
-            println!("Committing with message: '{}'", test_message);
-            git_engine.commit(test_message)?;
+            // Pass the message provided by the user in the CLI!
+            git_engine.commit(&message)?;
+
             println!("Commit successful!");
         }
     }
