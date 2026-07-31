@@ -97,7 +97,14 @@ async fn main() -> Result<()> {
             let provider_strategy = registry.get_active_provider(&config)?;
 
             let context = CommitContext { diff };
-            let message = provider_strategy.generate_commit(&context).await?;
+            let message = provider_strategy
+                .generate_commit(&context)
+                .await?
+                .replace("```", "")
+                .replace("commit\n", "")
+                .replace("text\n", "")
+                .trim()
+                .to_string();
 
             // println!("✨ Suggested Commit Message:\n");
             // println!("{}", message);
