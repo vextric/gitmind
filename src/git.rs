@@ -86,7 +86,7 @@ impl GitEngine {
     }
 
     /// Get the diff of all changes (staged and unstaged) against HEAD
-    pub fn get_diff(&self) -> Result<String> {
+    pub fn get_diff(&self, ignored_exts: &[String]) -> Result<String> {
         let mut diff_opts = DiffOptions::new();
 
         // Get the current HEAD (the latest commit) and turn it into a "Tree"
@@ -105,7 +105,22 @@ impl GitEngine {
         let mut diff_text = String::new();
 
         // Format the diff into a standard patch (similar to `git diff`)
-        diff.print(DiffFormat::Patch, |_delta, _hunk, line| {
+        diff.print(DiffFormat::Patch, |delta, _hunk, line| {
+            let should_skip = delta
+                .new_file()
+                .path()
+                .and_then(|p| p.extension()) // Get the OsStr extension
+                .and_then(|ext| ext.to_str()) // Safely convert OsStr to standard &str
+                .map(|ext_str| {
+                    // Check if our config's `ignored_exts` array contains this extension
+                    ignored_exts.iter().any(|ignored| ignored == ext_str)
+                })
+                .unwrap_or(false);
+
+            if should_skip {
+                return true;
+            }
+
             let origin = line.origin();
 
             // Add the +, -, or space prefix to the line

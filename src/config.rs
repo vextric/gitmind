@@ -23,6 +23,7 @@ pub struct ProjectConfig {
     pub languages: Option<Vec<String>>,
     pub additional_info: Option<String>,
     pub author_name: Option<String>,
+    pub ignored_extensions: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Debug)]

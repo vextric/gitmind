@@ -13,6 +13,7 @@ system_prompt = """
 languages = ["Rust", "Python"]
 additional_info = "This is a text."
 author_name = "Jon Due"
+ignored_extensions = ["lock"]
 
 [ollama]
 base_url = "http://localhost:11434"

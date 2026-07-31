@@ -36,14 +36,27 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let cli = Cli::parse();
+
     let mut registry = crate::llm::ProviderRegistry::new();
 
     // Register all known strategies here
     registry.register("ollama", crate::llm_providers::ollama::build_ollama);
     registry.register("avalai", crate::llm_providers::avalai::build_avalai);
 
-    let cli = Cli::parse();
     let git_engine = GitEngine::new()?;
+
+    let repo_root = git_engine
+        .get_repo_root()
+        .context("Could not determine repository root")?;
+    let config = config::GitMindConfig::load(repo_root)?;
+
+    // Safely extract the ignored extensions slice, defaulting to empty [] if it's missing
+    let ignored_exts = config
+        .project
+        .as_ref()
+        .and_then(|p| p.ignored_extensions.as_deref())
+        .unwrap_or_default();
 
     match &cli.command {
         Commands::Status => {
@@ -70,7 +83,7 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Diff => {
-            let diff = git_engine.get_diff()?;
+            let diff = git_engine.get_diff(ignored_exts)?;
 
             if diff.is_empty() {
                 println!("No changes to diff.");
@@ -81,17 +94,12 @@ async fn main() -> Result<()> {
         Commands::Generate => {
             println!("Analyzing diff and generating message...\n");
 
-            let diff = git_engine.get_diff()?;
+            let diff = git_engine.get_diff(ignored_exts)?;
 
             if diff.is_empty() {
                 println!("No changes detected. Nothing to commit.");
                 return Ok(());
             }
-
-            let repo_root = git_engine
-                .get_repo_root()
-                .context("Could not determine repository root")?;
-            let config = config::GitMindConfig::load(repo_root)?;
 
             // Ask the registry for the strategy
             let provider_strategy = registry.get_active_provider(&config)?;
