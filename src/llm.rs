@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use tracing::debug;
 
 use crate::config::GitMindConfig;
 
@@ -35,6 +36,7 @@ impl ProviderRegistry {
         // F is any function/closure that matches our builder signature
         F: Fn(&GitMindConfig) -> anyhow::Result<Box<dyn LlmProvider>> + 'static,
     {
+        debug!("Registering provider strategy: {}", name);
         self.builders.insert(name.to_string(), Box::new(builder));
     }
     /// Retrieve and build the active provider strategy based on the config
@@ -42,6 +44,7 @@ impl ProviderRegistry {
         &self,
         config: &GitMindConfig,
     ) -> anyhow::Result<Box<dyn LlmProvider>> {
+        debug!("Retrieving provider strategy for active provider: {}", config.active_provider);
         // Find the builder associated with the active_provider string
         let builder = self.builders.get(&config.active_provider).ok_or_else(|| {
             anyhow::anyhow!(

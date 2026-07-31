@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use tracing::{debug, error};
 
 use crate::{
     config::GitMindConfig,
@@ -65,6 +66,11 @@ impl LlmProvider for AvalAiProvider {
             input: &context.diff,
         };
 
+        debug!("Sending request to AvalAI URL: {}", self.base_url);
+        if let Ok(json_str) = serde_json::to_string_pretty(&request_body) {
+            debug!("AvalAI Request Body:\n{}", json_str);
+        }
+
         // Make the HTTP POST request
         let response = self
             .client
@@ -78,6 +84,7 @@ impl LlmProvider for AvalAiProvider {
         // Ensure the request succeeded (status code 200)
         if !response.status().is_success() {
             let error_text = response.text().await?;
+            error!("AvalAI API returned an error: {}", error_text);
             anyhow::bail!("LLM API error: {}", error_text);
         }
 

@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
+use tracing::debug;
 
 #[derive(Debug, PartialEq)] // This allows us to print it and compare it
 pub enum FileStatus {
@@ -82,11 +83,13 @@ impl GitEngine {
             }
         }
 
+        debug!("Found {} changed files", changed_files.len());
         Ok(changed_files)
     }
 
     /// Get the diff of all changes (staged and unstaged) against HEAD
     pub fn get_diff(&self, ignored_exts: &[String]) -> Result<String> {
+        debug!("Generating git diff against HEAD...");
         let mut diff_opts = DiffOptions::new();
 
         // Get the current HEAD (the latest commit) and turn it into a "Tree"
@@ -143,6 +146,7 @@ impl GitEngine {
 
     /// Execute the actual git commit
     pub fn commit(&self, message: &str) -> Result<()> {
+        debug!("Executing 'git commit -a -m ...'");
         // While we COULD use git2 to create the commit, using std::process::Command
         // to shell out to the git executable is often better for the final commit.
         // This ensures the user's pre-commit hooks, GPG signing, and global git

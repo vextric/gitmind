@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use tracing::{debug, error};
 
 use crate::{
     config::GitMindConfig,
@@ -58,6 +59,11 @@ impl LlmProvider for OllamaProvider {
         // Ensure the host URL doesn't have a trailing slash before appending the path
         let url = format!("{}/api/generate", self.host.trim_end_matches('/'));
 
+        debug!("Sending request to Ollama URL: {}", url);
+        if let Ok(json_str) = serde_json::to_string_pretty(&request_body) {
+            debug!("Ollama Request Body:\n{}", json_str);
+        }
+
         // Make the HTTP POST request (No API key needed!)
         let response = self
             .client
@@ -70,6 +76,7 @@ impl LlmProvider for OllamaProvider {
         // Check for success
         if !response.status().is_success() {
             let error_text = response.text().await?;
+            error!("Ollama API returned an error: {}", error_text);
             anyhow::bail!("Ollama API error: {}", error_text);
         }
 

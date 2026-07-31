@@ -7,6 +7,8 @@ use anyhow::{Context, Result};
 use arboard::Clipboard;
 use clap::{Parser, Subcommand};
 use dialoguer::{Input, Select, theme::ColorfulTheme};
+use tracing::{debug, error, info, warn};
+use tracing_subscriber::EnvFilter;
 
 use crate::{git::GitEngine, llm::CommitContext};
 
@@ -35,7 +37,26 @@ enum Commands {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
+    tracing_subscriber::fmt()
+        // Try to read RUST_LOG from the environment
+        //  If it fails (or doesn't exist), fall back to "info"
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
+        .without_time()
+        .with_target(false)
+        .init();
+
+    // We wrap the actual logic in `run_app()` so that if an error bubbles up 
+    // using `?`, we can catch it here and log it properly using `error!`
+    if let Err(e) = run_app().await {
+        error!("Fatal Error: {:#}", e);
+        std::process::exit(1);
+    }
+}
+
+async fn run_app() -> Result<()> {
     let cli = Cli::parse();
 
     let mut registry = crate::llm::ProviderRegistry::new();
@@ -45,11 +66,14 @@ async fn main() -> Result<()> {
     registry.register("avalai", crate::llm_providers::avalai::build_avalai);
 
     let git_engine = GitEngine::new()?;
+    debug!("GitEngine initialized successfully.");
 
     let repo_root = git_engine
         .get_repo_root()
         .context("Could not determine repository root")?;
+    
     let config = config::GitMindConfig::load(repo_root)?;
+    debug!("Config loaded. Active provider: {}", config.active_provider);
 
     // Safely extract the ignored extensions slice, defaulting to empty [] if it's missing
     let ignored_exts = config
@@ -57,17 +81,18 @@ async fn main() -> Result<()> {
         .as_ref()
         .and_then(|p| p.ignored_extensions.as_deref())
         .unwrap_or_default();
+    debug!("Ignoring extensions: {:?}", ignored_exts);
 
     match &cli.command {
         Commands::Status => {
-            println!("Analyzing repository...\n");
+            info!("Analyzing repository...\n");
 
             let changed_files = git_engine.get_changed_files()?;
 
             if changed_files.is_empty() {
-                println!("No changes detected. Working tree is clean.");
+                info!("No changes detected. Working tree is clean.");
             } else {
-                println!("Changed files:");
+                info!("Changed files:");
 
                 for file in changed_files {
                     // Rust's match statement makes formatting based on enums incredibly easy
@@ -78,7 +103,7 @@ async fn main() -> Result<()> {
                     };
 
                     // .display() safely formats the file path for terminal output
-                    println!("  {:12} {}", prefix, file.path.display());
+                    info!("  {:12} {}", prefix, file.path.display());
                 }
             }
         }
@@ -86,18 +111,19 @@ async fn main() -> Result<()> {
             let diff = git_engine.get_diff(ignored_exts)?;
 
             if diff.is_empty() {
-                println!("No changes to diff.");
+                info!("No changes to diff.");
             } else {
-                println!("{}", diff);
+                info!("{}", diff);
             }
         }
         Commands::Generate => {
-            println!("Analyzing diff and generating message...\n");
+            info!("Analyzing diff and generating message...\n");
 
             let diff = git_engine.get_diff(ignored_exts)?;
+            debug!("Diff successfully generated ({} bytes)", diff.len());
 
             if diff.is_empty() {
-                println!("No changes detected. Nothing to commit.");
+                info!("No changes detected. Nothing to commit.");
                 return Ok(());
             }
 
@@ -118,10 +144,11 @@ async fn main() -> Result<()> {
             // println!("{}", message);
             // println!("\n(Use 'gitmind commit' to apply this, once implemented)");
 
-            println!(
+            info!(
                 "\nGenerated Commit Message:\n------------------------\n{}\n------------------------\n",
                 message
             );
+
             // We make the message mutable so the user can edit it if they choose to
             let mut final_message = message;
             let options = &["Commit now", "Edit message", "Copy to clipboard", "Cancel"];
@@ -138,9 +165,9 @@ async fn main() -> Result<()> {
                 match selection {
                     0 => {
                         // "Commit now"
-                        println!("Committing...");
+                        info!("Committing...");
                         git_engine.commit(&final_message)?;
-                        println!("Commit successful!");
+                        info!("Commit successful!");
                         break;
                     }
                     1 => {
@@ -151,7 +178,7 @@ async fn main() -> Result<()> {
                             .with_prompt("Edit message")
                             .default(final_message)
                             .interact_text()?;
-                        println!("\nUpdated message to:\n{}\n", final_message);
+                        info!("\nUpdated message to:\n{}\n", final_message);
                         // The loop repeats so they can choose to commit it now!
                     }
                     2 => {
@@ -161,24 +188,24 @@ async fn main() -> Result<()> {
                         clipboard
                             .set_text(&final_message)
                             .context("Failed to copy to clipboard")?;
-                        println!("Copied to clipboard!");
+                        info!("Copied to clipboard!");
                         break;
                     }
                     3 | _ => {
                         // "Cancel" or escape
-                        println!("Aborted.");
+                        info!("Aborted.");
                         break;
                     }
                 }
             }
         }
         Commands::Commit { message } => {
-            println!("Committing with message: '{}'", message);
+            info!("Committing with message: '{}'", message);
 
             // Pass the message provided by the user in the CLI!
             git_engine.commit(&message)?;
 
-            println!("Commit successful!");
+            info!("Commit successful!");
         }
     }
 

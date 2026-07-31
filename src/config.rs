@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use serde::Deserialize;
+use tracing::debug;
 use std::fs;
 use std::path::Path;
 
@@ -44,6 +45,7 @@ impl GitMindConfig {
     pub fn load(repo_root: &Path) -> Result<Self> {
         // Construct the path: <repo_root>/.gitmind.toml
         let config_path = repo_root.join(".gitmind.toml");
+        debug!("Looking for configuration file at {:?}", config_path);
 
         // Read the file. If it doesn't exist, we provide a helpful error message.
         let config_str = fs::read_to_string(&config_path).context(format!(
@@ -54,6 +56,8 @@ impl GitMindConfig {
         // Parse the TOML string into our struct just like before
         let config: GitMindConfig =
             toml::from_str(&config_str).context("Failed to parse .gitmind.toml config file")?;
+        
+        debug!("Successfully loaded and parsed .gitmind.toml");
 
         Ok(config)
     }
