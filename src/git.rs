@@ -2,6 +2,19 @@ use anyhow::{Context, Result};
 use git2::{DiffFormat, DiffOptions, Repository, StatusOptions};
 use std::{path::PathBuf, process::Command};
 
+#[derive(Debug, PartialEq)] // This allows us to print it and compare it
+pub enum FileStatus {
+    Staged,
+    Changed,
+    Untracked,
+}
+
+#[derive(Debug)]
+pub struct GitFile {
+    pub path: PathBuf,
+    pub status: FileStatus,
+}
+
 pub struct GitEngine {
     repo: Repository,
 }
@@ -17,7 +30,7 @@ impl GitEngine {
     }
 
     /// Get a list of changed files (modified, added, deleted, untracked)
-    pub fn get_changed_files(&self) -> Result<Vec<PathBuf>> {
+    pub fn get_changed_files(&self) -> Result<Vec<GitFile>> {
         let mut options = StatusOptions::new();
 
         // We want to see untracked files, but skip ignored files (like target/ or node_modules/)
@@ -31,21 +44,31 @@ impl GitEngine {
             let status = entry.status();
 
             // We are looking for any status that indicates a change
-            let is_changed = status.intersects(
+            // A file can technically be both Staged and Changed in Git
+            //      - but this if/else if chain simplifies it by prioritizing Staged
+            let file_status = if status.intersects(
                 git2::Status::INDEX_NEW
                     | git2::Status::INDEX_MODIFIED
                     | git2::Status::INDEX_DELETED
-                    | git2::Status::INDEX_RENAMED
-                    | git2::Status::WT_NEW
-                    | git2::Status::WT_MODIFIED
-                    | git2::Status::WT_DELETED
-                    | git2::Status::WT_RENAMED,
-            );
+                    | git2::Status::INDEX_RENAMED,
+            ) {
+                Some(FileStatus::Staged)
+            } else if status.intersects(git2::Status::WT_NEW) {
+                Some(FileStatus::Untracked)
+            } else if status.intersects(
+                git2::Status::WT_MODIFIED | git2::Status::WT_DELETED | git2::Status::WT_RENAMED,
+            ) {
+                Some(FileStatus::Changed)
+            } else {
+                None // Not a status we care about
+            };
 
-            if is_changed {
-                if let Ok(path) = entry.path() {
-                    changed_files.push(PathBuf::from(path));
-                }
+            // If we found a valid status and a valid path, push it to our vector!
+            if let (Some(fs), Ok(path)) = (file_status, entry.path()) {
+                changed_files.push(GitFile {
+                    path: PathBuf::from(path),
+                    status: fs,
+                });
             }
         }
 
