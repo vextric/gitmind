@@ -1,0 +1,10 @@
+active_provider = "avalai"
+
+[ollama]
+base_url = "http://localhost:11434"
+model = "model-name"
+
+[avalai]
+base_url = "https://api.avalai.ir/v1/responses"
+api_key = "api-key"
+model = "model-name"
