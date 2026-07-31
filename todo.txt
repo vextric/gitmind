@@ -1,0 +1,1 @@
+(C) 2026-07-31 Current commit generator only looks for the file diffs. We need to give it more in the config file we need to implement stuff like: languages used, additional information and so on +commit_message +name @So

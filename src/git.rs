@@ -1,6 +1,9 @@
 use anyhow::{Context, Result};
 use git2::{DiffFormat, DiffOptions, Repository, StatusOptions};
-use std::{path::PathBuf, process::Command};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 #[derive(Debug, PartialEq)] // This allows us to print it and compare it
 pub enum FileStatus {
@@ -27,6 +30,13 @@ impl GitEngine {
             .context("Failed to open git repository. Are you running this inside a git folder?")?;
 
         Ok(Self { repo })
+    }
+
+    /// Returns the path to the root of the git repository
+    pub fn get_repo_root(&self) -> Option<&Path> {
+        // workdir() returns the path to the working directory of the repository.
+        // It returns None if this is a "bare" repository, which we don't need to worry about right now.
+        self.repo.workdir()
     }
 
     /// Get a list of changed files (modified, added, deleted, untracked)

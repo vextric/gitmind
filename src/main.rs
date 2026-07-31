@@ -1,9 +1,12 @@
+mod config;
 mod git;
+mod llm;
+mod llm_providers;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
-use crate::git::GitEngine;
+use crate::{git::GitEngine, llm::CommitContext};
 
 /// 🧠 GitMind: An AI-powered Git commit assistant
 #[derive(Parser, Debug)]
@@ -27,6 +30,12 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let mut registry = crate::llm::ProviderRegistry::new();
+
+    // Register all known strategies here
+    registry.register("ollama", crate::llm_providers::ollama::build_ollama);
+    registry.register("openai", crate::llm_providers::openai::build_openai);
+
     let cli = Cli::parse();
 
     match &cli.command {
@@ -66,8 +75,30 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Generate => {
-            println!("Generating commit message...");
-            // TODO: Hook up LLM here
+            println!("Analyzing diff and generating message...\n");
+
+            let git_engine = GitEngine::new()?;
+            let diff = git_engine.get_diff()?;
+
+            if diff.is_empty() {
+                println!("No changes detected. Nothing to commit.");
+                return Ok(());
+            }
+
+            let repo_root = git_engine
+                .get_repo_root()
+                .context("Could not determine repository root")?;
+            let config = config::GitMindConfig::load(repo_root)?;
+
+            // Ask the registry for the strategy
+            let provider_strategy = registry.get_active_provider(&config)?;
+
+            let context = CommitContext { diff };
+            let message = provider_strategy.generate_commit(&context).await?;
+
+            println!("✨ Suggested Commit Message:\n");
+            println!("{}", message);
+            println!("\n(Use 'gitmind commit' to apply this, once implemented)");
         }
         Commands::Commit => {
             let git_engine = GitEngine::new()?;
