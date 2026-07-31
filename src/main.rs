@@ -48,7 +48,6 @@ async fn main() -> Result<()> {
             if changed_files.is_empty() {
                 println!("No changes detected. Working tree is clean.");
             } else {
-                // TODO: Mark the untracked files and don't show them as changed
                 println!("Changed files:");
 
                 for file in changed_files {

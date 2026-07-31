@@ -1,5 +1,19 @@
 active_provider = "avalai"
 
+system_prompt = """
+    You are an expert developer summarizing code changes. You will be given a git diff. Your task is to write a conventional commit message for these changes.
+    CRITICAL INSTRUCTIONS:
+        - Output ONLY the raw commit message.
+        - Do NOT output JSON.
+        - Do NOT output tool or function calls.
+        - Do not include any conversational filler (like 'Here is your commit message').
+"""
+
+[project]
+languages = ["Rust", "Python"]
+additional_info = "This is a text."
+author_name = "Jon Due"
+
 [ollama]
 base_url = "http://localhost:11434"
 model = "model-name"

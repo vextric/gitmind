@@ -9,9 +9,20 @@ pub struct GitMindConfig {
     // We will use this to determine which provider to load
     pub active_provider: String,
 
-    // We use Option because a user might not have configured OpenAI if they only use Ollama
+    pub project: Option<ProjectConfig>,
+
+    // We use Option because a user might not have configured AvalAi f they only use Ollama
     pub ollama: Option<OllamaConfig>,
     pub avalai: Option<AvalAiConfig>,
+
+    pub system_prompt: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ProjectConfig {
+    pub languages: Option<Vec<String>>,
+    pub additional_info: Option<String>,
+    pub author_name: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -44,5 +55,27 @@ impl GitMindConfig {
             toml::from_str(&config_str).context("Failed to parse .gitmind.toml config file")?;
 
         Ok(config)
+    }
+
+    // Giving the LLM some more context about the project
+    pub fn get_system_prompt(&self) -> String {
+        let mut system_prompt = self.system_prompt.clone();
+
+        if let Some(project) = &self.project {
+            if let Some(langs) = &project.languages {
+                system_prompt.push_str(&format!(
+                    "The project uses these languages: {}. ",
+                    langs.join(", ")
+                ));
+            }
+            if let Some(author) = &project.author_name {
+                system_prompt.push_str(&format!("The author's name is {}. ", author));
+            }
+            if let Some(info) = &project.additional_info {
+                system_prompt.push_str(&format!("Additional context: {}. ", info));
+            }
+        }
+
+        system_prompt
     }
 }

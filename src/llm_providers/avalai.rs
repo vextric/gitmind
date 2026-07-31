@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::GitMindConfig,
-    llm::{CommitContext, LlmProvider, SYSTEM_PROMPT},
+    llm::{CommitContext, LlmProvider},
 };
 
 // --- AvalAI Implementation ---
@@ -15,15 +15,17 @@ pub struct AvalAiProvider {
     base_url: String,
     api_key: String,
     model: String,
+    prompt: String,
 }
 
 impl AvalAiProvider {
-    pub fn new(base_url: String, api_key: String, model: String) -> Self {
+    pub fn new(base_url: String, api_key: String, model: String, prompt: String) -> Self {
         Self {
             client: Client::new(),
             base_url,
             api_key,
             model,
+            prompt,
         }
     }
 }
@@ -59,7 +61,7 @@ impl LlmProvider for AvalAiProvider {
         // Build the payload using our structs
         let request_body = AvalAiRequest {
             model: &self.model,
-            instructions: SYSTEM_PROMPT,
+            instructions: &self.prompt,
             input: &context.diff,
         };
 
@@ -110,6 +112,7 @@ pub fn build_avalai(config: &GitMindConfig) -> anyhow::Result<Box<dyn LlmProvide
         o_conf.base_url.clone(),
         o_conf.api_key.clone(),
         o_conf.model.clone(),
+        config.get_system_prompt(),
     );
     Ok(Box::new(client))
 }
