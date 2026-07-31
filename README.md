@@ -58,4 +58,8 @@ cargo run -- --help
 - [Clap](https://crates.io/crates/clap) - CLI argument parsing
 - [Git2](https://crates.io/crates/git2) - Git interactions
 - [Tokio](https://tokio.rs/) - Async runtime
+- [dialoguer](https://crates.io/crates/dialoguer)
+- [serde](https://crates.io/crates/serde)
+- [arboard](https://crates.io/crates/arboard)
+- [anyhow](https://crates.io/crates/anyhow)
 - _Future: Ratatui, Crossterm, Portable-pty_
