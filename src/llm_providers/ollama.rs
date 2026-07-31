@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::GitMindConfig,
-    llm::{CommitContext, LlmProvider, SYSTEM_PROMPT},
+    llm::{CommitContext, LlmProvider},
 };
 
 // --- Ollama Implementation ---
@@ -38,6 +38,15 @@ struct OllamaRequest<'a> {
 struct OllamaResponse {
     response: String,
 }
+
+pub const SYSTEM_PROMPT: &str = r#"
+    You are an expert developer summarizing code changes. You will be given a git diff. Your task is to write a conventional commit message for these changes.
+    CRITICAL INSTRUCTIONS:
+        - Output ONLY the raw commit message.
+        - Do NOT output JSON.
+        - Do NOT output tool or function calls.
+        - Do not include any conversational filler (like 'Here is your commit message').
+"#;
 
 #[async_trait]
 impl LlmProvider for OllamaProvider {
@@ -89,6 +98,7 @@ pub fn build_ollama(config: &GitMindConfig) -> anyhow::Result<Box<dyn LlmProvide
         .as_ref()
         .ok_or_else(|| anyhow::anyhow!("Ollama config section is missing from .gitmind.toml"))?;
 
+    // This is a test comment to test the app
     let client = OllamaProvider::new(o_conf.base_url.clone(), o_conf.model.clone());
     Ok(Box::new(client))
 }

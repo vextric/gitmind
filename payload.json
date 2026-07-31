@@ -1,0 +1,5 @@
+{
+  "model": "gpt-5.5",
+  "instructions": "You are a helpful assistant.",
+  "input": "Hello, world!"
+}

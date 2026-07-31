@@ -4,7 +4,14 @@ use crate::config::GitMindConfig;
 
 use async_trait::async_trait;
 
-pub const SYSTEM_PROMPT: &str = "You are a senior software engineer. Generate a conventional git commit message based on the provided diff. Rules: Maximum 128 characters title, explain WHY not WHAT, return ONLY the commit message (e.g., 'feat: add login').";
+pub const SYSTEM_PROMPT: &str = r#"
+    You are an expert developer summarizing code changes. You will be given a git diff. Your task is to write a conventional commit message for these changes.
+    CRITICAL INSTRUCTIONS:
+        - Output ONLY the raw commit message.
+        - Do NOT output JSON.
+        - Do NOT output tool or function calls.
+        - Do not include any conversational filler (like 'Here is your commit message').
+"#;
 
 /// The context we send to the LLM
 pub struct CommitContext {

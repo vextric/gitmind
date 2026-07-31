@@ -8,16 +8,16 @@ use crate::{
     llm::{CommitContext, LlmProvider, SYSTEM_PROMPT},
 };
 
-// --- OpenAI Implementation ---
-/// A provider for OpenAI-compatible APIs
-pub struct OpenAiProvider {
+// --- AvalAI Implementation ---
+/// A provider for AvalAI-compatible APIs
+pub struct AvalAiProvider {
     client: Client,
     base_url: String,
     api_key: String,
     model: String,
 }
 
-impl OpenAiProvider {
+impl AvalAiProvider {
     pub fn new(base_url: String, api_key: String, model: String) -> Self {
         Self {
             client: Client::new(),
@@ -31,58 +31,37 @@ impl OpenAiProvider {
 // --- Serde Structs for JSON Parsing ---
 // #[derive(Serialize)] automatically writes the code to turn this struct into JSON.
 #[derive(Serialize)]
-struct OpenAiRequest<'a> {
+struct AvalAiRequest<'a> {
     model: &'a str,
-    messages: Vec<Message<'a>>,
-}
-
-#[derive(Serialize)]
-struct Message<'a> {
-    role: &'a str,
-    content: &'a str,
+    instructions: &'a str,
+    input: &'a str,
 }
 
 // #[derive(Deserialize)] automatically writes the code to turn JSON into this struct.
-#[derive(Deserialize)]
-struct OpenAiResponse {
-    choices: Vec<Choice>,
+#[derive(Deserialize, Debug)]
+struct AvalAiResponse {
+    output: Vec<Output>,
 }
 
-#[derive(Deserialize)]
-struct Choice {
-    message: ResponseMessage,
+#[derive(Deserialize, Debug)]
+struct Output {
+    content: Vec<Content>,
 }
 
-#[derive(Deserialize)]
-struct ResponseMessage {
-    content: String,
+#[derive(Deserialize, Debug)]
+struct Content {
+    text: String,
 }
 
 #[async_trait]
-impl LlmProvider for OpenAiProvider {
+impl LlmProvider for AvalAiProvider {
     async fn generate_commit(&self, context: &CommitContext) -> Result<String> {
         // Build the payload using our structs
-        let request_body = OpenAiRequest {
+        let request_body = AvalAiRequest {
             model: &self.model,
-            messages: vec![
-                Message {
-                    role: "system",
-                    content: SYSTEM_PROMPT,
-                },
-                Message {
-                    role: "user",
-                    content: &context.diff,
-                },
-            ],
+            instructions: SYSTEM_PROMPT,
+            input: &context.diff,
         };
-
-        match serde_json::to_string_pretty(&request_body) {
-            Ok(json_string) => println!(
-                "--- DEBUG: OpenAI Request Body ---\n{}\n----------------------------------",
-                json_string
-            ),
-            Err(e) => println!("Failed to serialize request body for debugging: {}", e),
-        }
 
         // Make the HTTP POST request
         let response = self
@@ -100,20 +79,20 @@ impl LlmProvider for OpenAiProvider {
             anyhow::bail!("LLM API error: {}", error_text);
         }
 
-        // Parse the JSON response into our OpenAiResponse struct
-        let response_data: OpenAiResponse = response
+        // Parse the JSON response into our AvalAiResponse struct
+        let response_data: AvalAiResponse = response
             .json()
             .await
             .context("Failed to parse LLM response")?;
 
         // Extract the actual text string and clean it up
         let commit_message = response_data
-            .choices
+            .output
             .into_iter()
             .next()
-            .context("LLM returned an empty choice list")?
-            .message
-            .content
+            .context("LLM returned an empty output list")?
+            .content[0]
+            .text
             .trim()
             .to_string();
 
@@ -121,13 +100,13 @@ impl LlmProvider for OpenAiProvider {
     }
 }
 
-pub fn build_openai(config: &GitMindConfig) -> anyhow::Result<Box<dyn LlmProvider>> {
+pub fn build_avalai(config: &GitMindConfig) -> anyhow::Result<Box<dyn LlmProvider>> {
     let o_conf = config
-        .openai
+        .avalai
         .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("OpenAI config section is missing from .gitmind.toml"))?;
+        .ok_or_else(|| anyhow::anyhow!("AvalAI config section is missing from .gitmind.toml"))?;
 
-    let client = OpenAiProvider::new(
+    let client = AvalAiProvider::new(
         o_conf.base_url.clone(),
         o_conf.api_key.clone(),
         o_conf.model.clone(),

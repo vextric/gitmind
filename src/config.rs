@@ -11,7 +11,7 @@ pub struct GitMindConfig {
 
     // We use Option because a user might not have configured OpenAI if they only use Ollama
     pub ollama: Option<OllamaConfig>,
-    pub openai: Option<OpenAIConfig>,
+    pub avalai: Option<AvalAiConfig>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -21,7 +21,7 @@ pub struct OllamaConfig {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct OpenAIConfig {
+pub struct AvalAiConfig {
     pub base_url: String,
     pub api_key: String,
     pub model: String,

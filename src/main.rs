@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
 
     // Register all known strategies here
     registry.register("ollama", crate::llm_providers::ollama::build_ollama);
-    registry.register("openai", crate::llm_providers::openai::build_openai);
+    registry.register("avalai", crate::llm_providers::avalai::build_avalai);
 
     let cli = Cli::parse();
 
