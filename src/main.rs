@@ -43,8 +43,15 @@ async fn main() -> Result<()> {
                 println!("Changed files:");
 
                 for file in changed_files {
+                    // Rust's match statement makes formatting based on enums incredibly easy
+                    let prefix = match file.status {
+                        crate::git::FileStatus::Staged => "[STAGED]",
+                        crate::git::FileStatus::Changed => "[MODIFIED]",
+                        crate::git::FileStatus::Untracked => "[UNTRACKED]",
+                    };
+
                     // .display() safely formats the file path for terminal output
-                    println!("  - {}", file.display());
+                    println!("  {:12} {}", prefix, file.path.display());
                 }
             }
         }
