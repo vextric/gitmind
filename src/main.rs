@@ -120,6 +120,17 @@ async fn run_app() -> Result<(), GitMindError> {
         Commands::Generate => {
             info!("Analyzing diff and generating message...\n");
 
+            let changed_files = git_engine.get_changed_files()?;
+            let has_unstaged_or_untracked = changed_files.iter().any(|f| {
+                f.status == crate::git::FileStatus::Changed || f.status == crate::git::FileStatus::Untracked
+            });
+
+            if has_unstaged_or_untracked {
+                return Err(GitMindError::Generic(
+                    "You have unstaged or untracked changes. Please stage them before generating a commit message.".into()
+                ));
+            }
+
             let diff = git_engine.get_diff(ignored_exts)?;
             debug!("Diff successfully generated ({} bytes)", diff.len());
 
