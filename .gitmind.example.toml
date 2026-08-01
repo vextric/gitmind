@@ -1,4 +1,4 @@
-active_provider = "avalai"
+active_provider = "cli:gemini"
 
 system_prompt = """
     You are an expert developer summarizing code changes. You will be given a git diff. Your task is to write a conventional commit message for these changes.
@@ -23,3 +23,6 @@ model = "model-name"
 base_url = "https://api.avalai.ir/v1/responses"
 api_key = "api-key"
 model = "model-name"
+
+[cli]
+gemini = '"path to gemini" -p $prompt'

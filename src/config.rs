@@ -1,8 +1,9 @@
 use crate::error::GitMindError;
 use serde::Deserialize;
-use tracing::debug;
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use tracing::debug;
 
 // This represents the entire TOML file
 #[derive(Deserialize, Debug)]
@@ -15,6 +16,7 @@ pub struct GitMindConfig {
     // We use Option because a user might not have configured AvalAi f they only use Ollama
     pub ollama: Option<OllamaConfig>,
     pub avalai: Option<AvalAiConfig>,
+    pub cli: Option<HashMap<String, String>>,
 
     pub system_prompt: String,
 }
@@ -53,7 +55,7 @@ impl GitMindConfig {
 
         // Parse the TOML string into our struct just like before
         let config: GitMindConfig = toml::from_str(&config_str)?;
-        
+
         debug!("Successfully loaded and parsed .gitmind.toml");
 
         Ok(config)

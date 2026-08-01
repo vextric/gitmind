@@ -45,8 +45,10 @@ impl ProviderRegistry {
         config: &GitMindConfig,
     ) -> Result<Box<dyn LlmProvider>, GitMindError> {
         debug!("Retrieving provider strategy for active provider: {}", config.active_provider);
-        // Find the builder associated with the active_provider string
-        let builder = self.builders.get(&config.active_provider).ok_or_else(|| {
+        // Split the provider string to handle variants (e.g., "cli:gemini")
+        // We only care about the first part ("cli") to find the builder.
+        let provider_base = config.active_provider.split(':').next().unwrap_or(&config.active_provider);
+        let builder = self.builders.get(provider_base).ok_or_else(|| {
             GitMindError::ProviderNotFound(config.active_provider.clone())
         })?;
         // Execute the builder function to instantiate the strategy

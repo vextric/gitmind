@@ -48,7 +48,7 @@ async fn main() {
         .with_target(false)
         .init();
 
-    // We wrap the actual logic in `run_app()` so that if an error bubbles up 
+    // We wrap the actual logic in `run_app()` so that if an error bubbles up
     // using `?`, we can catch it here and log it properly using `error!`
     if let Err(e) = run_app().await {
         error!("Fatal Error: {:#}", e);
@@ -64,6 +64,7 @@ async fn run_app() -> Result<(), GitMindError> {
     // Register all known strategies here
     registry.register("ollama", crate::llm_providers::ollama::build_ollama);
     registry.register("avalai", crate::llm_providers::avalai::build_avalai);
+    registry.register("cli", crate::llm_providers::cli::build_cli);
 
     let git_engine = GitEngine::new()?;
     debug!("GitEngine initialized successfully.");
@@ -71,7 +72,7 @@ async fn run_app() -> Result<(), GitMindError> {
     let repo_root = git_engine
         .get_repo_root()
         .ok_or_else(|| GitMindError::Generic("Could not determine repository root".into()))?;
-    
+
     let config = config::GitMindConfig::load(repo_root)?;
     debug!("Config loaded. Active provider: {}", config.active_provider);
 
