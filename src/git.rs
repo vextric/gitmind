@@ -86,19 +86,22 @@ impl GitEngine {
         Ok(changed_files)
     }
 
-    /// Get the diff of all changes (staged and unstaged) against HEAD
+    /// Get the diff of staged changes against HEAD
     pub fn get_diff(&self, ignored_exts: &[String]) -> Result<String, GitMindError> {
-        debug!("Generating git diff against HEAD...");
+        debug!("Generating git diff of staged changes against HEAD...");
         let mut diff_opts = DiffOptions::new();
 
         // Get the current HEAD (the latest commit) and turn it into a "Tree"
         let head = self.repo.head()?;
         let head_tree = head.peel_to_tree()?;
 
-        // Generate the diff between the HEAD tree and the current working directory
+        // Get the current index (staging area)
+        let index = self.repo.index()?;
+
+        // Generate the diff between the HEAD tree and the index
         let diff = self
             .repo
-            .diff_tree_to_workdir_with_index(Some(&head_tree), Some(&mut diff_opts))?;
+            .diff_tree_to_index(Some(&head_tree), Some(&index), Some(&mut diff_opts))?;
 
         let mut diff_text = String::new();
 
@@ -140,14 +143,14 @@ impl GitEngine {
 
     /// Execute the actual git commit
     pub fn commit(&self, message: &str) -> Result<(), GitMindError> {
-        debug!("Executing 'git commit -a -m ...'");
+        debug!("Executing 'git commit -m ...'");
         // While we COULD use git2 to create the commit, using std::process::Command
         // to shell out to the git executable is often better for the final commit.
         // This ensures the user's pre-commit hooks, GPG signing, and global git
         // config are all executed correctly automatically!
 
         let status = Command::new("git")
-            .args(["commit", "-a", "-m", message]) // -a stages all modified/deleted files
+            .args(["commit", "-m", message]) // We removed -a so it only commits staged files
             .status()?;
 
         if status.success() {

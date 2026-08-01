@@ -121,14 +121,26 @@ async fn run_app() -> Result<(), GitMindError> {
             info!("Analyzing diff and generating message...\n");
 
             let changed_files = git_engine.get_changed_files()?;
+            let has_staged = changed_files
+                .iter()
+                .any(|f| f.status == crate::git::FileStatus::Staged);
             let has_unstaged_or_untracked = changed_files.iter().any(|f| {
-                f.status == crate::git::FileStatus::Changed || f.status == crate::git::FileStatus::Untracked
+                f.status == crate::git::FileStatus::Changed
+                    || f.status == crate::git::FileStatus::Untracked
             });
 
+            if !has_staged {
+                eprintln!(" ❌ No staged changes found.");
+                eprintln!(
+                    " Please stage your changes before generating a commit message (e.g., 'git add .')."
+                );
+                std::process::exit(1);
+            }
+
             if has_unstaged_or_untracked {
-                return Err(GitMindError::Generic(
-                    "You have unstaged or untracked changes. Please stage them before generating a commit message.".into()
-                ));
+                info!(
+                    "Note: You have unstaged changes. Only staged files will be included in the commit."
+                );
             }
 
             let diff = git_engine.get_diff(ignored_exts)?;
